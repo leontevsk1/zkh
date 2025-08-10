@@ -1,0 +1,84 @@
+fastapi 0.116.1 FastAPI framework, high performance, easy to learn, fast to code, ready for production
+├── pydantic >=1.7.4,<1.8 || >1.8,<1.8.1 || >1.8.1,<2.0.0 || >2.0.0,<2.0.1 || >2.0.1,<2.1.0 || >2.1.0,<3.0.0
+│   ├── annotated-types >=0.6.0 
+│   ├── pydantic-core 2.33.2 
+│   │   └── typing-extensions >=4.6.0,<4.7.0 || >4.7.0 
+│   ├── typing-extensions >=4.12.2 (circular dependency aborted here)
+│   └── typing-inspection >=0.4.0 
+│       └── typing-extensions >=4.12.0 (circular dependency aborted here)
+├── starlette >=0.40.0,<0.48.0
+│   └── anyio >=3.6.2,<5 
+│       ├── idna >=2.8 
+│       └── sniffio >=1.1 
+└── typing-extensions >=4.8.0
+faster-whisper 1.2.0 Faster Whisper transcription with CTranslate2
+├── av >=11
+├── ctranslate2 >=4.0,<5
+│   ├── numpy * 
+│   ├── pyyaml >=5.3,<7 
+│   └── setuptools * 
+├── huggingface-hub >=0.13
+│   ├── filelock * 
+│   ├── fsspec >=2023.5.0 
+│   ├── hf-xet >=1.1.3,<2.0.0 
+│   ├── packaging >=20.9 
+│   ├── pyyaml >=5.1 
+│   ├── requests * 
+│   │   ├── certifi >=2017.4.17 
+│   │   ├── charset-normalizer >=2,<4 
+│   │   ├── idna >=2.5,<4 
+│   │   └── urllib3 >=1.21.1,<3 
+│   ├── tqdm >=4.42.1 
+│   │   └── colorama * 
+│   └── typing-extensions >=3.7.4.3 
+├── onnxruntime >=1.14,<2
+│   ├── coloredlogs * 
+│   │   └── humanfriendly >=9.1 
+│   │       └── pyreadline3 * 
+│   ├── flatbuffers * 
+│   ├── numpy >=1.21.6 
+│   ├── packaging * 
+│   ├── protobuf * 
+│   └── sympy * 
+│       └── mpmath >=1.1.0,<1.4 
+├── tokenizers >=0.13,<1
+│   └── huggingface-hub >=0.16.4,<1.0 
+│       ├── filelock * 
+│       ├── fsspec >=2023.5.0 
+│       ├── hf-xet >=1.1.3,<2.0.0 
+│       ├── packaging >=20.9 
+│       ├── pyyaml >=5.1 
+│       ├── requests * 
+│       │   ├── certifi >=2017.4.17 
+│       │   ├── charset-normalizer >=2,<4 
+│       │   ├── idna >=2.5,<4 
+│       │   └── urllib3 >=1.21.1,<3 
+│       ├── tqdm >=4.42.1 
+│       │   └── colorama * 
+│       └── typing-extensions >=3.7.4.3 
+└── tqdm *
+    └── colorama * 
+hf-transfer 0.1.9 Speed up file transfers with the Hugging Face Hub.
+huggingface-hub 0.34.4 Client library to download and publish models, datasets and other repos on the huggingface.co hub
+├── filelock *
+├── fsspec >=2023.5.0
+├── hf-xet >=1.1.3,<2.0.0
+├── packaging >=20.9
+├── pyyaml >=5.1
+├── requests *
+│   ├── certifi >=2017.4.17 
+│   ├── charset-normalizer >=2,<4 
+│   ├── idna >=2.5,<4 
+│   └── urllib3 >=1.21.1,<3 
+├── tqdm >=4.42.1
+│   └── colorama * 
+└── typing-extensions >=3.7.4.3
+requests 2.32.4 Python HTTP for Humans.
+├── certifi >=2017.4.17
+├── charset-normalizer >=2,<4
+├── idna >=2.5,<4
+└── urllib3 >=1.21.1,<3
+uvicorn 0.35.0 The lightning-fast ASGI server.
+├── click >=7.0
+│   └── colorama * 
+└── h11 >=0.8

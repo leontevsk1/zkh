@@ -1,0 +1,23 @@
+fastapi 0.116.1 FastAPI framework, high performance, easy to learn, fast to code, ready for production
+├── pydantic >=1.7.4,<1.8 || >1.8,<1.8.1 || >1.8.1,<2.0.0 || >2.0.0,<2.0.1 || >2.0.1,<2.1.0 || >2.1.0,<3.0.0
+│   ├── annotated-types >=0.6.0 
+│   ├── pydantic-core 2.33.2 
+│   │   └── typing-extensions >=4.6.0,<4.7.0 || >4.7.0 
+│   ├── typing-extensions >=4.12.2 (circular dependency aborted here)
+│   └── typing-inspection >=0.4.0 
+│       └── typing-extensions >=4.12.0 (circular dependency aborted here)
+├── starlette >=0.40.0,<0.48.0
+│   └── anyio >=3.6.2,<5 
+│       ├── idna >=2.8 
+│       └── sniffio >=1.1 
+└── typing-extensions >=4.8.0
+python-multipart 0.0.20 A streaming multipart parser for Python
+requests 2.32.4 Python HTTP for Humans.
+├── certifi >=2017.4.17
+├── charset-normalizer >=2,<4
+├── idna >=2.5,<4
+└── urllib3 >=1.21.1,<3
+uvicorn 0.35.0 The lightning-fast ASGI server.
+├── click >=7.0
+│   └── colorama * 
+└── h11 >=0.8
