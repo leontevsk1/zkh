@@ -4,6 +4,7 @@ from uuid import uuid4
 from pathlib import Path
 from threading import Lock
 import requests, time
+import uvicorn
 
 ASR_URL = "http://whisper:8000/transcribe"
 ML_URL  = "http://ml:8010/infer"
