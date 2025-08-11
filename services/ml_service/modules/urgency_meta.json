@@ -1,0 +1,21 @@
+{
+  "name": "urgency_lgbm_pipeline",
+  "task": "ordinal_regression_1_4",
+  "created_at": "2025-08-11T18:36:00.491141Z",
+  "versions": {
+    "python": "3.11.13",
+    "sklearn": "1.6.1",
+    "lightgbm": "4.6.0"
+  },
+  "postprocess": {
+    "clip": [
+      1,
+      4
+    ],
+    "round": true
+  },
+  "inputs": {
+    "text": "str",
+    "service": "str"
+  }
+}
