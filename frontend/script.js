@@ -5,7 +5,12 @@ const voiceBtn = document.getElementById('voice-btn');
 
 let userMessage = null;
 let userAddress = null;
-let awaitingAddress = false;
+let isRecording = false;
+let mediaRecorder;
+let audioChunks = [];
+
+// --- Настройка API ---
+const CONTROLLER_URL = "http://localhost:8000/healthz";  // Замени, если нужно
 
 // Функция добавления сообщения в чат
 function addMessage(text, sender) {
@@ -30,7 +35,9 @@ function addElementToChat(element) {
 sendBtn.addEventListener('click', () => {
     const text = textInput.value.trim();
     if (text) {
-        handleUserMessage(text);
+        userMessage = text;
+        addMessage(text, 'user');
+        requestAddress(text);
         textInput.value = '';
     }
 });
@@ -41,57 +48,155 @@ textInput.addEventListener('keypress', (e) => {
     }
 });
 
-// Обработка голосового ввода
-async function transcribeAudio(audioBlob) {
+// Голосовой ввод
+voiceBtn.addEventListener('click', async () => {
+    if (isRecording) {
+        // Остановить запись
+        mediaRecorder.stop();
+        isRecording = false;
+        voiceBtn.classList.remove('recording');
+        voiceBtn.textContent = '🎤';
+    } else {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+
+            audioChunks = [];
+            mediaRecorder.ondataavailable = (e) => {
+                audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+
+                // Конвертация в WAV (16 кГц, моно)
+                const wavBlob = await convertToWav(audioBlob);
+
+                // Показываем аудио в чате
+                const voiceMsg = document.createElement('div');
+                voiceMsg.classList.add('message', 'user');
+                const audioEl = document.createElement('audio');
+                audioEl.controls = true;
+                audioEl.src = URL.createObjectURL(wavBlob);
+                voiceMsg.appendChild(audioEl);
+                chat.appendChild(voiceMsg);
+                chat.scrollTop = chat.scrollHeight;
+
+                // Кнопка отправки на сервер
+                const sendToServerBtn = document.createElement('button');
+                sendToServerBtn.textContent = '📤 Отправить на обработку';
+                sendToServerBtn.style.marginTop = '5px';
+
+                sendToServerBtn.onclick = () => {
+                    sendToServerBtn.disabled = true;
+                    sendToServerBtn.textContent = 'Отправляю...';
+                    sendAudioToController(wavBlob);
+                };
+
+                const wrapper = document.createElement('div');
+                wrapper.classList.add('message', 'server');
+                wrapper.appendChild(sendToServerBtn);
+                chat.appendChild(wrapper);
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            voiceBtn.classList.add('recording');
+            voiceBtn.textContent = '●';
+        } catch (err) {
+            alert('Ошибка доступа к микрофону: ' + err.message);
+            console.error(err);
+        }
+    }
+});
+
+// Конвертация в WAV (16kHz, mono)
+async function convertToWav(audioBlob) {
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const decoded = await audioContext.decodeAudioData(arrayBuffer);
+
+    // Ресемплинг до 16 кГц
+    const offlineContext = new OfflineAudioContext(1, decoded.length * (16000 / decoded.sampleRate), 16000);
+    const source = offlineContext.createBufferSource();
+    source.buffer = decoded;
+    source.connect(offlineContext.destination);
+    source.start();
+
+    const renderedBuffer = await offlineContext.startRendering();
+
+    // Кодируем в WAV
+    const wavBuffer = encodeWAV(renderedBuffer.getChannelData(0));
+    return new Blob([wavBuffer], { type: 'audio/wav' });
+}
+
+// Кодирование в WAV (PCM, 16-bit)
+function encodeWAV(samples) {
+    const sampleRate = 16000;
+    const buffer = new ArrayBuffer(44 + samples.length * 2);
+    const view = new DataView(buffer);
+
+    const writeString = (offset, str) => {
+        for (let i = 0; i < str.length; i++) {
+            view.setUint8(offset + i, str.charCodeAt(i));
+        }
+    };
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + samples.length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, samples.length * 2, true);
+
+    let offset = 44;
+    for (let i = 0; i < samples.length; i++) {
+        const s = Math.max(-1, Math.min(1, samples[i]));
+        const val = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        view.setInt16(offset, val, true);
+        offset += 2;
+    }
+
+    return buffer;
+}
+
+// Отправка аудио на управляющий сервис
+async function sendAudioToController(wavBlob) {
+    const formData = new FormData();
+    formData.append('file', wavBlob, 'recording.wav');
+
     try {
-        const arrayBuffer = await audioBlob.arrayBuffer();
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const audioData = await audioContext.decodeAudioData(arrayBuffer);
+        const response = await fetch(CONTROLLER_URL, {
+            method: 'POST',
+            body: formData
+        });
 
-        const sampleRate = 16000;
-        const offlineContext = new OfflineAudioContext(1, audioData.duration * sampleRate, sampleRate);
-        const source = offlineContext.createBufferSource();
-        source.buffer = offlineContext.createBuffer(1, audioData.length, sampleRate);
-        source.buffer.copyFromChannel(audioData.getChannelData(0), 0);
-        source.connect(offlineContext.destination);
-        source.start();
+        if (response.ok) {
+            const result = await response.json();
+            const requestId = result.request_id || "неизвестен";
 
-        const renderedBuffer = await offlineContext.startRendering();
+            addMessage(`Ваше голосовое сообщение отправлено на обработку.\nID: ${requestId}`, 'server');
 
-        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = 'ru-RU';
-        recognition.interimResults = false;
-
-        recognition.onresult = (event) => {
-            const transcript = event.results[0][0].transcript.trim();
-            if (transcript) {
-                addMessage(transcript, 'user');
-                handleUserMessage(transcript);
-            }
-        };
-
-        recognition.onerror = () => {
-            addMessage("Не удалось распознать речь. Попробуйте ещё раз.", 'server');
-        };
-
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        audio.onloadedmetadata = () => {
-            recognition.start();
-            audio.play();
-        };
-
+            // Теперь запрашиваем адрес
+            requestAddress("Голосовое сообщение");
+        } else {
+            const errorText = await response.text();
+            addMessage(`Ошибка при отправке: ${response.status}\n${errorText}`, 'server');
+        }
     } catch (err) {
-        addMessage("Ошибка обработки аудио: " + err.message, 'server');
+        addMessage(`Не удалось подключиться к сервису: ${err.message}`, 'server');
     }
 }
 
-// Обработка сообщения пользователя
-function handleUserMessage(text) {
-    userMessage = text;
-    addMessage(text, 'user');
-
-    // Спрашиваем адрес
+// Запрос адреса
+function requestAddress(text) {
     addMessage("Пожалуйста, уточните адрес дома:", 'server');
     const addressInput = document.createElement('input');
     addressInput.type = 'text';
@@ -99,20 +204,15 @@ function handleUserMessage(text) {
     addressInput.classList.add('address-input');
 
     const submitBtn = document.createElement('button');
-    submitBtn.textContent = 'Отправить адрес';
+    submitBtn.textContent = 'Отправить';
     submitBtn.style.marginLeft = '5px';
 
     submitBtn.onclick = () => {
         const addr = addressInput.value.trim();
         if (addr) {
-            // Убираем инпут и кнопку
+            confirmAddress(text, addr);
             addressInput.disabled = true;
             submitBtn.disabled = true;
-            submitBtn.textContent = "Отправлено";
-            submitBtn.onclick = null;
-            addressInput.style.opacity = "0.6";
-
-            confirmAddress(addr);
         } else {
             addMessage("Адрес не может быть пустым.", 'server');
         }
@@ -124,21 +224,19 @@ function handleUserMessage(text) {
         }
     });
 
-    const inputWrapper = document.createElement('div');
-    inputWrapper.classList.add('message', 'server');
-    inputWrapper.appendChild(addressInput);
-    inputWrapper.appendChild(submitBtn);
-
-    chat.appendChild(inputWrapper);
+    const wrapper = document.createElement('div');
+    wrapper.classList.add('message', 'server');
+    wrapper.appendChild(addressInput);
+    wrapper.appendChild(submitBtn);
+    chat.appendChild(wrapper);
     chat.scrollTop = chat.scrollHeight;
 
     addressInput.focus();
 }
 
 // Подтверждение адреса
-function confirmAddress(address) {
-    userAddress = address;
-    const confirmationText = `Вы отправили заявку:\n"${userMessage}"\nАдрес: ${userAddress}\n\nВсё верно?`;
+function confirmAddress(text, address) {
+    const confirmationText = `Вы отправили заявку:\n"${text}"\nАдрес: ${address}\n\nВсё верно?`;
 
     addMessage(confirmationText, 'server');
 
@@ -164,24 +262,18 @@ function confirmAddress(address) {
     editBtn.style.borderRadius = '4px';
     editBtn.style.cursor = 'pointer';
 
-    // Кнопка "Верно" — удаляет ВСЁ и показывает финальное сообщение
     correctBtn.onclick = () => {
-        // Удаляем контейнер с кнопками
         buttonContainer.remove();
-
-        // Удаляем предыдущее сообщение с вопросом "Всё верно?"
-        const lastMessage = chat.lastElementChild;
-        if (lastMessage && lastMessage.textContent.includes('Всё верно?')) {
-            lastMessage.remove();
+        const lastMsg = chat.lastElementChild;
+        if (lastMsg && lastMsg.textContent.includes('Всё верно?')) {
+            lastMsg.remove();
         }
-
-        // Отправляем финальное сообщение
-        finalizeRequest();
+        finalizeRequest(text, address);
     };
 
     editBtn.onclick = () => {
         buttonContainer.remove();
-        askForAddressAgain();
+        requestAddress(text);
     };
 
     buttonContainer.appendChild(correctBtn);
@@ -189,116 +281,8 @@ function confirmAddress(address) {
     addElementToChat(buttonContainer);
 }
 
-// Повторный ввод адреса
-function askForAddressAgain() {
-    addMessage("Введите адрес заново:", 'server');
-    const addressInput = document.createElement('input');
-    addressInput.type = 'text';
-    addressInput.placeholder = 'ул. Пушкина, д. 5';
-    addressInput.classList.add('address-input');
-
-    const submitBtn = document.createElement('button');
-    submitBtn.textContent = 'Отправить';
-    submitBtn.style.marginLeft = '5px';
-
-    submitBtn.onclick = () => {
-        const addr = addressInput.value.trim();
-        if (addr) {
-            addressInput.disabled = true;
-            submitBtn.disabled = true;
-            submitBtn.textContent = "Отправлено";
-
-            // Удаляем сообщение "Введите адрес заново"
-            const lastMsg = chat.lastElementChild;
-            if (lastMsg && lastMsg.textContent.includes('адрес заново')) {
-                lastMsg.remove();
-            }
-
-            // Удаляем поле ввода
-            const wrapper = submitBtn.parentElement;
-            if (wrapper) wrapper.remove();
-
-            confirmAddress(addr);
-        }
-    };
-
-    addressInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            submitBtn.click();
-        }
-    });
-
-    const wrapper = document.createElement('div');
-    wrapper.classList.add('message', 'server');
-    wrapper.appendChild(addressInput);
-    wrapper.appendChild(submitBtn);
-    chat.appendChild(wrapper);
-    chat.scrollTop = chat.scrollHeight;
-
-    addressInput.focus();
-}
-
-// Финальная отправка заявки
-function finalizeRequest() {
-    const finalMessage = `✅ Заявка зарегистрирована!\n\nТекст: "${userMessage}"\nАдрес: ${userAddress}\n\nСпасибо за обращение.`;
+// Финальное подтверждение
+function finalizeRequest(text, address) {
+    const finalMessage = `Заявка зарегистрирована!\n\nТекст: "${text}"\nАдрес: ${address}\n\nСпасибо за обращение.`;
     addMessage(finalMessage, 'server');
-
-    // Можно отправить на сервер:
-    // fetch('/api/submit', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify({ message: userMessage, address: userAddress })
-    // });
-
-    // Сброс (на случай новой заявки)
-    userMessage = null;
-    userAddress = null;
 }
-
-// Голосовой ввод
-let isRecording = false;
-let mediaRecorder;
-let audioChunks = [];
-
-voiceBtn.addEventListener('click', async () => {
-    if (isRecording) {
-        mediaRecorder.stop();
-        isRecording = false;
-        voiceBtn.classList.remove('recording');
-        voiceBtn.textContent = '🎤';
-    } else {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-
-            audioChunks = [];
-            mediaRecorder.ondataavailable = (e) => {
-                audioChunks.push(e.data);
-            };
-
-            mediaRecorder.onstop = () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                const audioUrl = URL.createObjectURL(audioBlob);
-                const audioEl = document.createElement('audio');
-                audioEl.controls = true;
-                audioEl.src = audioUrl;
-
-                const voiceMsg = document.createElement('div');
-                voiceMsg.classList.add('message', 'user');
-                voiceMsg.appendChild(audioEl);
-                chat.appendChild(voiceMsg);
-                chat.scrollTop = chat.scrollHeight;
-
-                transcribeAudio(audioBlob);
-            };
-
-            mediaRecorder.start();
-            isRecording = true;
-            voiceBtn.classList.add('recording');
-            voiceBtn.textContent = '●';
-        } catch (err) {
-            alert('Ошибка доступа к микрофону: ' + err.message);
-            console.error(err);
-        }
-    }
-});
