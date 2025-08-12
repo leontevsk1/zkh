@@ -1,0 +1,17 @@
+{
+  "name": "service_classifier",
+  "created_at": "2025-08-11T19:10:07.587529Z",
+  "task": "multi-class (service)",
+  "inputs": {
+    "text": "str"
+  },
+  "features": [
+    "tfidf(1-2grams)",
+    "rule_feats(LEX)"
+  ],
+  "versions": {
+    "python": "3.11.13",
+    "scikit_learn": "1.6.1",
+    "scipy": "1.16.1"
+  }
+}
