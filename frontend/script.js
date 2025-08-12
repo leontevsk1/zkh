@@ -10,7 +10,7 @@ let mediaRecorder;
 let audioChunks = [];
 
 // --- Настройка API ---
-const CONTROLLER_URL = "http://localhost:8000/healthz";  // Замени, если нужно
+const CONTROLLER_URL = "http://localhost:8000/ingest_audio";
 
 // Функция добавления сообщения в чат
 function addMessage(text, sender) {
