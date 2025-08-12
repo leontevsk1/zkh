@@ -5,13 +5,29 @@ from pathlib import Path
 from threading import Lock
 import requests, time
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
+app = FastAPI()
+
+# Настройка CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[           # Разрешённые домены
+        "http://localhost:3000",   # твой фронтенд (если на Vite, React, и т.д.)
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",   # Vite default
+        "http://localhost:8080",
+        # можно добавить "*" для разработки, но НЕ для продакшена
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],      # Разрешить все методы (GET, POST, OPTIONS и т.д.)
+    allow_headers=["*"],      # Разрешить все заголовки
+)
 
 ASR_URL = "http://whisper:8000/transcribe"
 ML_URL  = "http://ml:8010/infer"
 ASR_LIMIT = 1
 ML_LIMIT  = 1
 
-app = FastAPI()
 lock = Lock()
 
 jobs = {}  # id -> dict
